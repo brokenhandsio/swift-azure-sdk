@@ -10,19 +10,25 @@ import XMLCoder
 public struct AzureStorage {
     public enum AzureStorageError: Error {
         case getUserDelegationKeyRequestFailed
+        case getOAuthTokenRequestFailed
     }
 
     public let client: AzureClient
-    public let baseURL: String = "https://brokenhandstest.blob.core.windows.net"
-    public let oauthAccessToken: String
+    public let accountURL: String
+
+    public init(client: AzureClient, accountURL: String) {
+        self.client = client
+        self.accountURL = accountURL
+    }
 
     public func requestUserDelegationKey(
         keyStartTime: Date = Date(),
         keyExpiryTime: Date
     ) async throws -> UserDelegationKey {
-        let url = baseURL + "/?restype=service&comp=userdelegationkey"
+        let url = accountURL + "/?restype=service&comp=userdelegationkey"
+        let oAuthToken = try await client.getCachedOAuthToken()
         let headers = HTTPHeaders([
-            ("Authorization", "Bearer \(oauthAccessToken)"),
+            ("Authorization", "Bearer \(oAuthToken)"),
             ("x-ms-version", "2022-11-02"),
         ])
 
@@ -60,11 +66,13 @@ public struct AzureStorage {
         start: Date? = nil,
         expiry: Date? = nil
     ) -> String {
+        let signedResource = "c"
+        let httpProtocol = "https"
         // see https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas#construct-a-user-delegation-sas
         var queryParameters = [
-            ("sr", "c"),  // TODO: Do not hardcode this
+            ("sr", signedResource),
             ("sp", permission.rawValue),
-            ("spr", "https"),
+            ("spr", httpProtocol),
             ("skt", userDelegationKey.signedStart.ISO8601Format()),
             ("st", start?.ISO8601Format() ?? userDelegationKey.signedStart.ISO8601Format()),
             ("ske", userDelegationKey.signedExpiry.ISO8601Format()),
@@ -81,41 +89,45 @@ public struct AzureStorage {
             permission.rawValue,
             start?.ISO8601Format() ?? userDelegationKey.signedStart.ISO8601Format(),
             expiry?.ISO8601Format() ?? userDelegationKey.signedExpiry.ISO8601Format(),
-            "/blob/" + accountName + "/" + containerName,// + "/" + blobName,
+            "/blob/" + accountName + "/" + containerName,  // + "/" + blobName,
             userDelegationKey.signedOID,
             userDelegationKey.signedTID,
             userDelegationKey.signedStart.ISO8601Format(),
             userDelegationKey.signedExpiry.ISO8601Format(),
             userDelegationKey.signedService.rawValue,
             userDelegationKey.signedVersion,
-            "", // signedAuthorizedUserObjectId
-            "", // signedUnauthorizedUserObjectId
-            "", // signedCorrelationId
-            "", // signedIP
-            "https",
+            "",  // signedAuthorizedUserObjectId
+            "",  // signedUnauthorizedUserObjectId
+            "",  // signedCorrelationId
+            "",  // signedIP
+            httpProtocol,
             userDelegationKey.signedVersion,
-            "c", // signedResource
-            "", // signedSnapshotTime
-            "", // signedEncryptionScope
-            "", // Cache Control
-            "", // Content Disposition
-            "", // Content Encoding
-            "", // Content Language
-            "", // Content Type
-        ].joined(separator: "\n")
+            signedResource,  // signedResource
+            "",  // signedSnapshotTime
+            "",  // signedEncryptionScope
+            "",  // Cache Control
+            "",  // Content Disposition
+            "",  // Content Encoding
+            "",  // Content Language
+            "",  // Content Type
+        ]
+        .joined(separator: "\n")
 
         let key = Array(
-            HMAC<SHA256>.authenticationCode(
-                for: stringToSign.data(using: .utf8)!,
-                using: SymmetricKey(data: Data(base64Encoded: userDelegationKey.value)!)
-            )
+            HMAC<SHA256>
+                .authenticationCode(
+                    for: stringToSign.data(using: .utf8)!,
+                    using: SymmetricKey(data: Data(base64Encoded: userDelegationKey.value)!)
+                )
         )
 
         queryParameters.append(("sig", Data(key).base64EncodedString()))
 
         let queryParametersString = queryParameters.map { $0.0 + "=" + $0.1 }.joined(separator: "&")
 
-        let url = "https://" + accountName + ".blob.core.windows.net/" + containerName + "/" + blobName + "?" + queryParametersString
+        let url =
+            "https://" + accountName + ".blob.core.windows.net/" + containerName + "/" + blobName + "?"
+            + queryParametersString
 
         return url
     }
@@ -140,15 +152,15 @@ public enum BlobSASPermission: String {
 }
 
 public struct UserDelegationKey: Decodable {
-    let value: String
-    let signedOID: String
-    let signedTID: String
-    let signedStart: Date
-    let signedExpiry: Date
-    let signedService: BlobService
-    let signedVersion: String
+    public let value: String
+    public let signedOID: String
+    public let signedTID: String
+    public let signedStart: Date
+    public let signedExpiry: Date
+    public let signedService: BlobService
+    public let signedVersion: String
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case value = "Value"
         case signedOID = "SignedOid"
         case signedTID = "SignedTid"
