@@ -21,6 +21,12 @@ public struct AzureStorage {
         self.accountURL = accountURL
     }
 
+    /// Requests a user delegation key from Azure Storage. This key can be used to build a SAS token for a blob.
+    /// - Parameters:
+    ///     - keyStartTime: The start time for the key. Defaults to now.
+    ///     - keyExpiryTime: The expiry time for the key.
+    /// - Returns: A `UserDelegationKey` object. This object contains the key value and other information needed to
+    /// build a SAS token.
     public func requestUserDelegationKey(
         keyStartTime: Date = Date(),
         keyExpiryTime: Date
@@ -57,6 +63,22 @@ public struct AzureStorage {
         return try decoder.decode(UserDelegationKey.self, from: responseBodyData)
     }
 
+    /// Constructs a SAS url for a blob using a user delegation key.
+    ///
+    /// This method does not perform any asynchronous operations. It is intended to be used with the result of
+    /// `requestUserDelegationKey`.
+    /// - Parameters:
+    ///     - accountName: The name of the storage account.
+    ///     - containerName: The name of the container.
+    ///     - blobName: The name of the blob. If the blob doesn't exist yet, this will be the name of the blob when it
+    ///       is created.
+    ///     - userDelegationKey: The user delegation key.
+    ///     - permission: The permission to grant to the SAS token. Defaults to read/write.
+    ///     - start: The start time for the SAS signature. Defaults to nil which will use the start time from the
+    ///       user delegation key.
+    ///     - expiry: The expiry time for the SAS signature. Defaults to nil which will use the expiry time from the
+    ///       user delegation key.
+    /// - Returns: A SAS url for the blob.
     public func constructUserDelegationSAS(
         accountName: String,
         containerName: String,

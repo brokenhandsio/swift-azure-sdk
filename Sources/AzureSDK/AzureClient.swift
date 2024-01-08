@@ -4,7 +4,7 @@ import Logging
 import NIOCore
 import NIOFoundationCompat
 
-public final actor AzureClient {
+public final class AzureClient {
     public enum AzureClientError: Error {
         case oAuthTokenRequestFailed
     }
