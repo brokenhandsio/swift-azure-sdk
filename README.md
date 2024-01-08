@@ -77,7 +77,7 @@ extension Application.Azure {
     public var storage: AzureStorage {
         get {
             guard let storage = self.application.storage[StorageKey.self] else {
-                fatalError("AzureStorage not setup. Use application.aws.storage = ...")
+                fatalError("AzureStorage not setup. Use application.azure.storage = ...")
             }
             return storage
         }
