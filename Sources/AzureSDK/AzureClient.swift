@@ -7,6 +7,7 @@ import NIOFoundationCompat
 public final class AzureClient {
     public enum AzureClientError: Error {
         case oAuthTokenRequestFailed
+        case unauthorized
     }
 
     public let client: HTTPClient
@@ -25,8 +26,8 @@ public final class AzureClient {
         self.clientSecret = clientSecret
     }
 
-    public func getCachedOAuthToken() async throws -> String {
-        if let oAuthToken, oAuthToken.expiresIn < Date() {
+    public func getCachedOAuthToken(forceRenew: Bool = false) async throws -> String {
+        if let oAuthToken, oAuthToken.expiresIn < Date(), forceRenew == false {
             return oAuthToken.accessToken
         } else {
             self.oAuthToken = try await requestOAuthToken()

@@ -31,8 +31,34 @@ public struct AzureStorage {
         keyStartTime: Date = Date(),
         keyExpiryTime: Date
     ) async throws -> UserDelegationKey {
+        var oAuthToken = try await client.getCachedOAuthToken()
+        // simple stupid retry logic
+        do {
+            return try await requestUserDelegationKey(
+                with: oAuthToken,
+                keyStartTime: keyStartTime,
+                keyExpiryTime: keyExpiryTime
+            )
+        } catch AzureClient.AzureClientError.unauthorized {
+            oAuthToken = try await client.getCachedOAuthToken(forceRenew: true)
+        } catch {
+            throw error
+        }
+
+        return try await requestUserDelegationKey(
+            with: oAuthToken,
+            keyStartTime: keyStartTime,
+            keyExpiryTime: keyExpiryTime
+        )
+    }
+
+
+    private func requestUserDelegationKey(
+        with oAuthToken: String,
+        keyStartTime: Date = Date(),
+        keyExpiryTime: Date
+    ) async throws -> UserDelegationKey {
         let url = accountURL + "/?restype=service&comp=userdelegationkey"
-        let oAuthToken = try await client.getCachedOAuthToken()
         let headers = HTTPHeaders([
             ("Authorization", "Bearer \(oAuthToken)"),
             ("x-ms-version", "2022-11-02"),
@@ -52,7 +78,12 @@ public struct AzureStorage {
         let responseBody = try await response.body.collect(upTo: 1024 * 1024)
         let responseBodyData = Data(buffer: responseBody)
 
-        guard response.status == .ok else {
+        switch response.status {
+        case .ok:
+            break
+        case .unauthorized:
+            throw AzureClient.AzureClientError.unauthorized
+        default:
             client.logger.error("Getting user delegation key failed with status code \(response.status.code)")
             throw AzureStorageError.getUserDelegationKeyRequestFailed
         }
