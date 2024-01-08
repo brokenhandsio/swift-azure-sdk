@@ -71,13 +71,13 @@ Optionally: Extend our new `Application.Azure` struct with `Storage`:
 ```swift
 extension Application.Azure {
     struct StorageKey: StorageKey {
-        typealias Value = Storage
+        typealias Value = AzureStorage
     }
 
-    public var storage: Storage {
+    public var storage: AzureStorage {
         get {
             guard let storage = self.application.storage[StorageKey.self] else {
-                fatalError("Storage not setup. Use application.aws.storage = ...")
+                fatalError("AzureStorage not setup. Use application.aws.storage = ...")
             }
             return storage
         }
@@ -87,8 +87,8 @@ extension Application.Azure {
     }
 }
 
-public extension Request.Storage {
-    var storage: Storage {
+public extension Request.Azure {
+    var storage: AzureStorage {
         return request.application.azure.storage
     }
 }
