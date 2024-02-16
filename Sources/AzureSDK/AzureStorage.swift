@@ -176,7 +176,10 @@ public struct AzureStorage {
         queryParameters.append(("sig", Data(key).base64EncodedString()))
 
         let queryParametersString = queryParameters
-            .map { $0.0 + "=" + $0.1.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)! }
+            .map { key, value in
+                let encodedValue = value.addingPercentEncoding(withAllowedCharacters: .rfc3986Unreserved) ?? ""
+                return "\(key)=\(encodedValue)"
+            }
             .joined(separator: "&")
 
         let url =
