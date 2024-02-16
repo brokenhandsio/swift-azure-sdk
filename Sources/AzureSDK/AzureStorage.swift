@@ -52,7 +52,6 @@ public struct AzureStorage {
         )
     }
 
-
     private func requestUserDelegationKey(
         with oAuthToken: String,
         keyStartTime: Date = Date(),
@@ -110,7 +109,7 @@ public struct AzureStorage {
     ///     - expiry: The expiry time for the SAS signature. Defaults to nil which will use the expiry time from the
     ///       user delegation key.
     /// - Returns: A SAS url for the blob.
-    public func constructUserDelegationSAS(
+    public func constructUserDelegationBlobSAS(
         accountName: String,
         containerName: String,
         blobName: String,
@@ -119,7 +118,7 @@ public struct AzureStorage {
         start: Date? = nil,
         expiry: Date? = nil
     ) -> String {
-        let signedResource = "c"
+        let signedResource = BlobService.blob.rawValue
         let httpProtocol = "https"
         // see https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas#construct-a-user-delegation-sas
         var queryParameters = [
@@ -142,27 +141,27 @@ public struct AzureStorage {
             permission.rawValue,
             start?.ISO8601Format() ?? userDelegationKey.signedStart.ISO8601Format(),
             expiry?.ISO8601Format() ?? userDelegationKey.signedExpiry.ISO8601Format(),
-            "/blob/" + accountName + "/" + containerName,  // + "/" + blobName,
+            "/blob/" + accountName + "/" + containerName + "/" + blobName,
             userDelegationKey.signedOID,
             userDelegationKey.signedTID,
             userDelegationKey.signedStart.ISO8601Format(),
             userDelegationKey.signedExpiry.ISO8601Format(),
             userDelegationKey.signedService.rawValue,
             userDelegationKey.signedVersion,
-            "",  // signedAuthorizedUserObjectId
-            "",  // signedUnauthorizedUserObjectId
-            "",  // signedCorrelationId
-            "",  // signedIP
+            "", // signedAuthorizedUserObjectId
+            "", // signedUnauthorizedUserObjectId
+            "", // signedCorrelationId
+            "", // signedIP
             httpProtocol,
             userDelegationKey.signedVersion,
-            signedResource,  // signedResource
-            "",  // signedSnapshotTime
-            "",  // signedEncryptionScope
-            "",  // Cache Control
-            "",  // Content Disposition
-            "",  // Content Encoding
-            "",  // Content Language
-            "",  // Content Type
+            signedResource, // signedResource
+            "", // signedSnapshotTime
+            "", // signedEncryptionScope
+            "", // Cache Control
+            "", // Content Disposition
+            "", // Content Encoding
+            "", // Content Language
+            "", // Content Type
         ]
         .joined(separator: "\n")
 
@@ -176,15 +175,16 @@ public struct AzureStorage {
 
         queryParameters.append(("sig", Data(key).base64EncodedString()))
 
-        let queryParametersString = queryParameters.map { $0.0 + "=" + $0.1 }.joined(separator: "&")
+        let queryParametersString = queryParameters
+            .map { $0.0 + "=" + $0.1.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)! }
+            .joined(separator: "&")
 
         let url =
             "https://" + accountName + ".blob.core.windows.net/" + containerName + "/" + blobName + "?"
-            + queryParametersString
+                + queryParametersString
 
         return url
     }
-
 }
 
 public enum BlobService: String, Decodable {
@@ -234,5 +234,4 @@ extension AzureStorage {
             case expiry = "Expiry"
         }
     }
-
 }
